@@ -29,9 +29,9 @@ func main() {
 		fmt.Println("Error reading from connection: ", err.Error())
 	}
 	reqStr := string(req)
-	reqParts := strings.Split(reqStr, "\r\n")
+	reqParts := strings.Split(reqStr, " ")
 
-	if reqParts[0] != "GET /" {
+	if reqParts[0] != "GET" && reqParts[1] != "/" {
 		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	} else {
 		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
