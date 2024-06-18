@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -22,5 +23,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	var req []byte
+	_, err = conn.Read(req)
+	if err != nil {
+		fmt.Println("Error reading from connection: ", err.Error())
+	}
+	reqStr := string(req)
+	reqParts := strings.Split(reqStr, "\r\n")
+
+	if reqParts[0] != "GET /" {
+		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+	} else {
+		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	}
+
 }
