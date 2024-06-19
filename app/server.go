@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -44,6 +45,15 @@ func HandleConnection(conn net.Conn) {
 		fmt.Println("Error readind request. ", err.Error())
 	}
 
+	if req.Method == "GET" {
+		HandleGet(conn, req)
+	} else if req.Method == "POST" {
+		HandlePost(conn, req)
+	}
+
+}
+
+func HandleGet(conn net.Conn, req *http.Request) {
 	if strings.HasPrefix(req.URL.Path, "/echo/") {
 		fmt.Println(req.URL.Path)
 		echo := strings.Replace(req.URL.Path, "/echo/", "", 1)
@@ -52,9 +62,23 @@ func HandleConnection(conn net.Conn) {
 		conn.Write([]byte(BuildResponseText(200, req.UserAgent())))
 	} else if strings.HasPrefix(req.URL.Path, "/files/") {
 		path := strings.Replace(req.URL.Path, "/files/", "", 1)
-		conn.Write(([]byte(ServeFile(path))))
+		conn.Write([]byte(ServeFile(path)))
 	} else if req.URL.Path == "/" {
 		conn.Write([]byte(EmptyResponse(200)))
+	} else {
+		conn.Write([]byte(EmptyResponse(404)))
+	}
+}
+
+func HandlePost(conn net.Conn, req *http.Request) {
+	if strings.HasPrefix(req.URL.Path, "/files/") {
+		path := strings.Replace(req.URL.Path, "/files/", "", 1)
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			conn.Write([]byte(EmptyResponse(400)))
+		}
+
+		conn.Write([]byte(PostFile(path, body)))
 	} else {
 		conn.Write([]byte(EmptyResponse(404)))
 	}
@@ -99,6 +123,8 @@ func ResponseCode(code int) string {
 	switch code {
 	case 200:
 		codeStr = "200 OK"
+	case 201:
+		codeStr = "201 Created"
 	case 404:
 		codeStr = "404 Not Found"
 	default:
@@ -106,4 +132,13 @@ func ResponseCode(code int) string {
 	}
 
 	return "HTTP/1.1 " + codeStr + "\r\n"
+}
+
+func PostFile(path string, data []byte) string {
+	err := os.WriteFile(param_directory+"/"+path, data, os.ModeAppend)
+	if err != nil {
+		return EmptyResponse(400)
+	}
+
+	return EmptyResponse(201)
 }
