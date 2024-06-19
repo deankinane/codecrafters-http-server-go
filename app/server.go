@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 )
 
@@ -99,8 +100,9 @@ func ServeFile(path string, encoding string) string {
 func BuildResponseBody(code int, content_type string, body []byte, encoding string) string {
 	response := ResponseCode(code)
 
+	encoding_types := strings.Fields(strings.ReplaceAll(encoding, ",", ""))
 	content_encoding := ""
-	if encoding == "gzip" {
+	if slices.Contains(encoding_types, "gzip") {
 		var b bytes.Buffer
 		w := gzip.NewWriter(&b)
 		w.Write(body)
