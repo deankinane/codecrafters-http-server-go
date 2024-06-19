@@ -20,21 +20,23 @@ func main() {
 	conn, err := l.Accept()
 	if err != nil {
 		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
+		return
 	}
 
-	var req []byte
-	_, err = conn.Read(req)
-	if err != nil {
-		fmt.Println("Error reading from connection: ", err.Error())
-	}
-	reqStr := string(req)
-	reqParts := strings.Split(reqStr, " ")
+	HandleConnection(conn)
+}
 
-	if reqParts[0] != "GET" && reqParts[1] != "/" {
+func HandleConnection(conn net.Conn) {
+	buf := make([]byte, 1024)
+	conn.Read(buf)
+	reqStr := string(buf)
+	reqParts := strings.Fields(reqStr)
+
+	fmt.Println(reqParts)
+
+	if reqParts[0] != "GET" || reqParts[1] != "/" {
 		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	} else {
 		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 	}
-
 }
