@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 )
@@ -27,16 +29,21 @@ func main() {
 }
 
 func HandleConnection(conn net.Conn) {
-	buf := make([]byte, 1024)
-	conn.Read(buf)
-	reqStr := string(buf)
-	reqParts := strings.Fields(reqStr)
-
-	fmt.Println(reqParts)
-
-	if reqParts[0] != "GET" || reqParts[1] != "/" {
-		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-	} else {
-		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	defer conn.Close()
+	req, err := http.ReadRequest(bufio.NewReader(conn))
+	if err != nil {
+		fmt.Println("Error readind request. ", err.Error())
 	}
+
+	if strings.HasPrefix(req.URL.Path, "/echo/") {
+		fmt.Println(req.URL.Path)
+		echo := strings.Replace(req.URL.Path, "/echo/", "", 1)
+		response := "HTTP/1.1 200 OK\r\n"
+		response += "Content-Type: text/plain\r\n"
+		response += "Content-Length: " + fmt.Sprint(len(echo)) + "\r\n"
+		response += "\r\n"
+		response += echo
+		conn.Write([]byte(response))
+	}
+
 }
