@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"net"
@@ -54,15 +56,16 @@ func HandleConnection(conn net.Conn) {
 }
 
 func HandleGet(conn net.Conn, req *http.Request) {
+	encoding := req.Header.Get("Accept-Encoding")
 	if strings.HasPrefix(req.URL.Path, "/echo/") {
 		fmt.Println(req.URL.Path)
 		echo := strings.Replace(req.URL.Path, "/echo/", "", 1)
-		conn.Write([]byte(BuildResponseText(200, echo)))
+		conn.Write([]byte(BuildResponseText(200, echo, encoding)))
 	} else if req.URL.Path == "/user-agent" {
-		conn.Write([]byte(BuildResponseText(200, req.UserAgent())))
+		conn.Write([]byte(BuildResponseText(200, req.UserAgent(), encoding)))
 	} else if strings.HasPrefix(req.URL.Path, "/files/") {
 		path := strings.Replace(req.URL.Path, "/files/", "", 1)
-		conn.Write([]byte(ServeFile(path)))
+		conn.Write([]byte(ServeFile(path, encoding)))
 	} else if req.URL.Path == "/" {
 		conn.Write([]byte(EmptyResponse(200)))
 	} else {
@@ -84,38 +87,57 @@ func HandlePost(conn net.Conn, req *http.Request) {
 	}
 }
 
-func ServeFile(path string) string {
+func ServeFile(path string, encoding string) string {
 	content, err := os.ReadFile(param_directory + "/" + path)
 	if err != nil {
 		return EmptyResponse(404)
 	}
 
-	return BuildResponseBinary(200, content)
+	return BuildResponseBinary(200, content, encoding)
 }
 
-func BuildResponseBody(code int, content_type string, content_length int, body string) string {
+func BuildResponseBody(code int, content_type string, body []byte, encoding string) string {
 	response := ResponseCode(code)
+
+	content_encoding := ""
+	if encoding == "gzip" {
+		var b bytes.Buffer
+		w := gzip.NewWriter(&b)
+		w.Write(body)
+		w.Close()
+		body = b.Bytes()
+		content_encoding = "Content-Encoding: gzip\r\n"
+	}
+
+	content_length := 0
+	switch content_type {
+	case "application/octet":
+		content_length = len(body)
+	default:
+		content_length = len(string(body))
+	}
 
 	if len(body) > 0 {
 		response += "Content-Type: " + content_type + "\r\n"
 		response += "Content-Length: " + fmt.Sprint(content_length) + "\r\n"
+		response += content_encoding
 	}
 
 	response += "\r\n"
-	response += body
+	response += string(body)
 	return response
 }
 
-func BuildResponseText(code int, body string) string {
-	return BuildResponseBody(code, "text/plain", len(body), body)
+func BuildResponseText(code int, body string, encoding string) string {
+	return BuildResponseBody(code, "text/plain", []byte(body), encoding)
 }
 
-func BuildResponseBinary(code int, body []byte) string {
-	return BuildResponseBody(code, "application/octet-stream", len(body), string(body))
+func BuildResponseBinary(code int, body []byte, encoding string) string {
+	return BuildResponseBody(code, "application/octet-stream", body, encoding)
 }
 
 func EmptyResponse(code int) string {
-	return BuildResponseText(code, "")
+	return BuildResponseText(code, "", "")
 }
 
 func ResponseCode(code int) string {
